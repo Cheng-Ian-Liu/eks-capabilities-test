@@ -43,23 +43,122 @@ This folder contains all files and documentation related to testing EKS Capabili
 - ✅ Workload cluster created successfully via ACK
 - ✅ Workload cluster status: ACTIVE
 - ✅ Test complete - All objectives achieved
+- ✅ Cleanup complete - All resources deleted
+
+## Cleanup Performed
+
+All test resources have been successfully cleaned up on February 24, 2026:
+
+### Deletion Order (Important!)
+
+1. **Workload cluster** - Must be deleted first
+   ```bash
+   aws eks delete-cluster \
+     --name eks-workload-cluster-test-only \
+     --region us-west-2
+   ```
+   Status: ✅ Deleted
+
+2. **ACK capability** - Delete after workload cluster deletion initiated
+   ```bash
+   aws eks delete-capability \
+     --cluster-name eks-mgmt-cluster-ack-test-only \
+     --region us-west-2 \
+     --capability-name ack-test-capability
+   ```
+   Status: ✅ Deleted
+   Note: Capability deletion took ~45 seconds
+
+3. **Management cluster** - Delete after capability is fully deleted
+   ```bash
+   aws eks delete-cluster \
+     --name eks-mgmt-cluster-ack-test-only \
+     --region us-west-2
+   ```
+   Status: ✅ Deleted
+
+4. **IAM roles and policies** - Clean up after clusters are deleted
+   
+   a. Detach policies from ACKCapabilityTestRole:
+   ```bash
+   aws iam detach-role-policy \
+     --role-name ACKCapabilityTestRole \
+     --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+   
+   aws iam detach-role-policy \
+     --role-name ACKCapabilityTestRole \
+     --policy-arn arn:aws:iam::833542146025:policy/ACKEKSPolicy
+   ```
+   
+   b. Delete inline policy and role:
+   ```bash
+   aws iam delete-role-policy \
+     --role-name ACKCapabilityTestRole \
+     --policy-name ACKEKSPolicy
+   
+   aws iam delete-role --role-name ACKCapabilityTestRole
+   ```
+   Status: ✅ Deleted
+   
+   c. Delete EKSWorkloadClusterRole:
+   ```bash
+   aws iam detach-role-policy \
+     --role-name EKSWorkloadClusterRole \
+     --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+   
+   aws iam delete-role --role-name EKSWorkloadClusterRole
+   ```
+   Status: ✅ Deleted
+   
+   d. Delete custom ACKEKSPolicy:
+   ```bash
+   aws iam delete-policy \
+     --policy-arn arn:aws:iam::833542146025:policy/ACKEKSPolicy
+   ```
+   Status: ✅ Deleted
+
+### Cleanup Notes
+
+- **Deletion order is critical**: Workload cluster → Capability → Management cluster → IAM resources
+- **Capability deletion**: Must wait for capability to fully delete before deleting management cluster
+- **IAM cleanup**: Both inline and attached policies must be removed before deleting roles
+- **Total cleanup time**: ~5-10 minutes for all resources
+- **No manual VPC/subnet cleanup needed**: Clusters used existing VPC resources
 
 ## Cleanup Commands
 
-```bash
-# Delete ACK-created workload cluster
-kubectl delete cluster eks-workload-cluster-test-only --context ack-test
+**Note: All test resources have been cleaned up. These commands are provided for reference.**
 
-# Delete ACK capability
+```bash
+# 1. Delete workload cluster
+aws eks delete-cluster \
+  --name eks-workload-cluster-test-only \
+  --region us-west-2
+
+# 2. Delete ACK capability (wait for workload cluster deletion to start)
 aws eks delete-capability \
   --cluster-name eks-mgmt-cluster-ack-test-only \
   --region us-west-2 \
   --capability-name ack-test-capability
 
-# Delete management cluster
+# 3. Delete management cluster (wait for capability deletion to complete)
 aws eks delete-cluster \
   --name eks-mgmt-cluster-ack-test-only \
   --region us-west-2
+
+# 4. Clean up IAM resources
+# Detach and delete ACKCapabilityTestRole
+aws iam detach-role-policy --role-name ACKCapabilityTestRole --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+aws iam detach-role-policy --role-name ACKCapabilityTestRole --policy-arn arn:aws:iam::833542146025:policy/ACKEKSPolicy
+aws iam delete-role-policy --role-name ACKCapabilityTestRole --policy-name ACKEKSPolicy
+aws iam delete-role --role-name ACKCapabilityTestRole
+
+# Detach and delete EKSWorkloadClusterRole
+aws iam detach-role-policy --role-name EKSWorkloadClusterRole --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+aws iam delete-role --role-name EKSWorkloadClusterRole
+
+# Delete custom policy
+aws iam delete-policy --policy-arn arn:aws:iam::833542146025:policy/ACKEKSPolicy
 ```
 
 ## Related Documentation
