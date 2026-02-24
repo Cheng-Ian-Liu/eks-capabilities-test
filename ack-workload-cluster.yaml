@@ -1,0 +1,22 @@
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: Cluster
+metadata:
+  name: eks-workload-cluster-test-only
+  namespace: default
+spec:
+  name: eks-workload-cluster-test-only
+  version: "1.35"
+  roleARN: arn:aws:iam::833542146025:role/EKSWorkloadClusterRole
+  resourcesVPCConfig:
+    subnetIDs:
+      - subnet-073d4470d493cf6bd  # 5g-upf-cluster-private-1 (us-west-2a)
+      - subnet-0e36ad809d6b27847  # 5g-upf-cluster-private-2 (us-west-2b)
+    endpointPublicAccess: true
+    endpointPrivateAccess: true
+  accessConfig:
+    authenticationMode: API_AND_CONFIG_MAP
+  tags:
+    Name: eks-workload-cluster-test-only
+    Environment: test
+    ManagedBy: ACK
+    Purpose: zero-node-capability-test
